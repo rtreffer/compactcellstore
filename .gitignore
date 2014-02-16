@@ -5,6 +5,9 @@
 
 cell_towers.csv.gz
 
+.cache
+.classpath
+.project
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
