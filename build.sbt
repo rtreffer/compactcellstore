@@ -23,3 +23,8 @@ libraryDependencies ++= Seq(
 )
 
 mainClass := Some("de.measite.compactstore.CellIdRewrite")
+
+fork in run := true
+
+javaOptions in run ++= Seq("-Xmx2G","-server")
+

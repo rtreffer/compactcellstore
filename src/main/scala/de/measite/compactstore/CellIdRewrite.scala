@@ -15,6 +15,15 @@ object CellIdRewrite extends App {
     val downloadURL = "http://downloads.opencellid.org/cell_towers.csv.gz"
     val towersFile = new File("./cell_towers.csv.gz")
 
+    val wlan1DownloadURL = "http://openbmap.org/latest/wifi/raw/wifi-input_raw2013.zip"
+    val wlanFile1 = new File("./wifi2013.zip")
+
+    val wlan2DownloadURL = "http://openbmap.org/latest/wifi/raw/wifi-input_raw.zip"
+    val wlanFile2 = new File("./wifi2014.zip")
+
+    val wlan3DownloadURL = "http://www.openwlanmap.org/db.tar.bz2"
+    val wlanFile3 = new File("./wifi.tar.bz2")
+
     if (!towersFile.exists || towersFile.length == 0) {
         println("Downloading opencellid database " + downloadURL)
         println("This can take some time...")
@@ -52,32 +61,26 @@ object CellIdRewrite extends App {
     println("Input file " + towersFile.getName() + " (" + towersFile.length + " bytes)")
 
     println("Reading input")
-    val map = new java.util.TreeMap[(Int,Int,Int,Int),(Double,Double)](new Comparator[(Int,Int,Int,Int)](){
-        override def compare(
-            l : (Int,Int,Int,Int),
-            r : (Int,Int,Int,Int)
-        ) : Int = {
-            if (l._1 < r._1) return -1
-            if (l._1 > r._1) return  1
-            if (l._2 < r._2) return -1
-            if (l._2 > r._2) return  1
-            if (l._3 < r._3) return -1
-            if (l._3 > r._3) return  1
-            if (l._4 < r._4) return -1
-            if (l._4 > r._4) return  1
-            return 0
-        }
-    })
 
     val writer = new Writer(
-        Array(classOf[Int],classOf[Int],classOf[Int],classOf[Int]),
-        Array(classOf[Double],classOf[Double])
+        Array(classOf[Integer],classOf[Integer],classOf[Integer],classOf[Integer]),
+        Array(classOf[java.lang.Double],classOf[java.lang.Double])
     )
+
+    val map = writer.newValueMap()
 
     {
         def string2int(s : String) = java.lang.Long.parseLong(s).toInt
         def encodeKey(mcc : Int,mnc : Int,cid : Int,lac : Int) =
-            writer.value2bytes(List(cid,lac,mcc,mnc)).get
+            List(
+                new Integer(lac),new Integer(cid),
+                new Integer(mcc),new Integer(mnc))
+            .map(e => writer.value2bytes(e).get)
+            .toArray
+        def encodeValue(lon : Double, lat : Double) =
+            List(new java.lang.Double(lon), new java.lang.Double(lat))
+            .map(e => writer.value2bytes(e).get)
+            .toArray
 
         val in = new LineNumberReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(towersFile))))
         var line = in.readLine()
@@ -86,22 +89,17 @@ object CellIdRewrite extends App {
         while (line != null) {
             val entries = line.split(",")
             try {
-                val (mcc,mnc,cid,lac) =
+                val (mcc,mnc,lac,cid) =
                     (string2int(entries(0)),string2int(entries(1)),string2int(entries(2)),string2int(entries(3)))
                 val (lon,lat) =
                     (
                         java.lang.Double.parseDouble(entries(4)),
                         java.lang.Double.parseDouble(entries(5))
                     )
-                map.put(
-                    (cid,lac,mcc,mnc),
-                    (lon,lat)
-                )
-                if (cid > 65535 && !map.containsKey((cid & 0xffff,lac,mcc,mnc))) {
-                    map.put(
-                        (cid & 0xffff,lac,mcc,mnc),
-                        (lon,lat)
-                    )
+                val v = encodeValue(lon,lat)
+                map.put(encodeKey(mcc,mnc,cid,lac),v)
+                if (cid > 0xffff && !map.containsKey(encodeKey(mcc,mnc,cid & 0xffff,lac))) {
+                    map.put(encodeKey(mcc,mnc,cid & 0xffff,lac),v)
                 }
                 if (map.size % 100000 == 0) {
                      println("Entries: " + map.size)
